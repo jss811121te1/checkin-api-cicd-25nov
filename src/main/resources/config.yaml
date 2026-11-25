@@ -1,0 +1,17 @@
+http:
+  host: "0.0.0.0"
+  port: "8081"
+  protocol: "HTTPS"
+
+tls:
+  keyStore:
+    type: "pkcs12"
+    path: "check-in-papi.p12"
+    alias: "server"
+    keyPassword: "mule12345"
+    password: "mule12345"
+
+api:
+  spec: "resource::ed0f4f9a-b943-47ea-8a44-1c778e11e67f:simplified-check-in-papi:1.2.0:oas:zip:api.yaml"
+  statusVar: "httpStatus"
+  headersVar: "outboundHeaders"

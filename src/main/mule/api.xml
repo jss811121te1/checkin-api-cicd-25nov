@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+    <flow name="api-main" doc:description="Exposes the Check-In API over HTTPS at /api/* and routes requests to the implemented operations.">
+        <http:listener config-ref="api-httpListenerConfig" path="/api/*" doc:description="Receives HTTPS Check-In API requests at /api/* using the shared listener configuration.">
+            <http:response statusCode="#[vars[p('api.statusVar')] default 200]" doc:description="Returns the APIkit status code and outbound headers on successful responses.">
+                <http:headers>#[vars[p('api.headersVar')] default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars[p('api.statusVar')] default 500]" doc:description="Returns APIkit error payloads with the status code stored in httpStatus.">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars[p('api.headersVar')] default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:router config-ref="api-config" doc:description="Validates requests against the Check-In API spec and dispatches them to the matching flow." />
+        <error-handler ref="api-global-error-handler" doc:description="Applies the shared api-global-error-handler to errors raised by APIkit routing."/>
+    </flow>
+    <flow name="api-console" doc:description="Serves the APIkit console at /console/* for exploring the Check-In API.">
+        <http:listener config-ref="api-httpListenerConfig" path="/console/*" doc:description="Receives HTTPS requests for the APIkit console at /console/*.">
+            <http:response statusCode="#[vars[p('api.statusVar')] default 200]" doc:description="Returns console responses with the APIkit status code and outbound headers.">
+                <http:headers>#[vars[p('api.headersVar')] default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars[p('api.statusVar')] default 500]" doc:description="Returns console error payloads with the status code stored in httpStatus.">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars[p('api.headersVar')] default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:console config-ref="api-config" doc:description="Renders the APIkit console generated from the Check-In API specification." />
+        <error-handler doc:description="Handles APIkit console errors with a JSON message and a 404 status.">
+            <on-error-propagate type="APIKIT:NOT_FOUND" doc:description="Catches APIKIT:NOT_FOUND in the console and propagates a JSON 404 response.">
+                <ee:transform doc:name="Transform Message" doc:description="Builds the JSON body and httpStatus variable for console resource-not-found errors.">
+                    <ee:message doc:description="Defines the JSON payload returned for console 404 errors.">
+                        <ee:set-payload doc:description="Sets a JSON body with a Resource not found message."><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables doc:description="Sets the HTTP status variable for the console error response.">
+                        <ee:set-variable variableName="${api.statusVar}" doc:description="Sets httpStatus to 404 for the console error response.">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+</mule>

@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:secure-properties="http://www.mulesoft.org/schema/mule/secure-properties" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:tls="http://www.mulesoft.org/schema/mule/tls" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/schema/mule/secure-properties/current/mule-secure-properties.xsd">
+    <configuration-properties file="config.yaml" doc:name="Configuration Properties" doc:description="Loads project parameters from config.yaml for listeners, TLS, and APIkit."/>
+    <http:listener-config name="api-httpListenerConfig" doc:description="Defines the configured HTTPS listener used by the API and console flows.">
+        <http:listener-connection host="${http.host}" port="${http.port}" protocol="${http.protocol}" tlsContext="TLS_Context" doc:description="Binds the configured host and port with HTTPS and TLS_Context."/>
+    </http:listener-config>
+    <apikit:config name="api-config" api="${api.spec}" outboundHeadersMapName="${api.headersVar}" httpStatusVarName="${api.statusVar}" doc:description="Loads the configured Simplified Check-In PAPI OAS spec for routing and validation." />
+    <tls:context name="TLS_Context" doc:name="TLS Context" doc:id="3f631850-fbc5-46d0-9067-570ae5e76a1f" doc:description="Provides the server key store used by the HTTPS listener.">
+        <tls:key-store type="${tls.keyStore.type}" path="${tls.keyStore.path}" alias="${tls.keyStore.alias}" keyPassword="${secure::tls.keyStore.keyPassword}" password="${secure::tls.keyStore.password}" doc:description="Loads the configured PKCS#12 server certificate and key."/>
+    </tls:context>
+    <secure-properties:config name="Secure_Properties_Config" doc:name="Secure Properties Config" doc:id="4082a34a-23b1-4751-851a-fe52f59ede2a" file="config-secure.yaml" key="${encrypt.key}" >
+		<secure-properties:encrypt algorithm="Blowfish" />
+	</secure-properties:config>
+	<error-handler name="api-global-error-handler" doc:description="Centralizes APIkit error responses reused by the main API listener flow.">
+        <on-error-propagate type="APIKIT:BAD_REQUEST" doc:description="Handles APIKIT:BAD_REQUEST by returning a JSON message and HTTP 400.">
+            <ee:transform doc:name="Transform Message" doc:description="Builds the JSON error body and httpStatus variable for bad requests.">
+                <ee:message doc:description="Defines the JSON payload for bad request errors.">
+                    <ee:set-payload doc:description="Sets a JSON body with a Bad request message."><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Bad request"}]]></ee:set-payload>
+                </ee:message>
+                <ee:variables doc:description="Sets the HTTP status variable for the bad request response.">
+                    <ee:set-variable variableName="${api.statusVar}" doc:description="Sets httpStatus to 400 for bad request errors.">400</ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+        </on-error-propagate>
+        <on-error-propagate type="APIKIT:NOT_FOUND" doc:description="Handles APIKIT:NOT_FOUND by returning a JSON message and HTTP 404.">
+            <ee:transform doc:name="Transform Message" doc:description="Builds the JSON error body and httpStatus variable for not found errors.">
+                <ee:message doc:description="Defines the JSON payload for resource-not-found errors.">
+                    <ee:set-payload doc:description="Sets a JSON body with a Resource not found message."><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                </ee:message>
+                <ee:variables doc:description="Sets the HTTP status variable for the not found response.">
+                    <ee:set-variable variableName="${api.statusVar}" doc:description="Sets httpStatus to 404 for not found errors.">404</ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+        </on-error-propagate>
+        <on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED" doc:description="Handles APIKIT:METHOD_NOT_ALLOWED with a JSON message and HTTP 405.">
+            <ee:transform doc:name="Transform Message" doc:description="Builds the JSON error body and httpStatus variable for unsupported methods.">
+                <ee:message doc:description="Defines the JSON payload for method-not-allowed errors.">
+                    <ee:set-payload doc:description="Sets a JSON body with a Method not allowed message."><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Method not allowed"}]]></ee:set-payload>
+                </ee:message>
+                <ee:variables doc:description="Sets the HTTP status variable for the method-not-allowed response.">
+                    <ee:set-variable variableName="${api.statusVar}" doc:description="Sets httpStatus to 405 for method-not-allowed errors.">405</ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+        </on-error-propagate>
+        <on-error-propagate type="APIKIT:NOT_ACCEPTABLE" doc:description="Handles APIKIT:NOT_ACCEPTABLE with a JSON message and HTTP 406.">
+            <ee:transform doc:name="Transform Message" doc:description="Builds the JSON error body and httpStatus variable for unacceptable requests.">
+                <ee:message doc:description="Defines the JSON payload for not-acceptable errors.">
+                    <ee:set-payload doc:description="Sets a JSON body with a Not acceptable message."><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not acceptable"}]]></ee:set-payload>
+                </ee:message>
+                <ee:variables doc:description="Sets the HTTP status variable for the not-acceptable response.">
+                    <ee:set-variable variableName="${api.statusVar}" doc:description="Sets httpStatus to 406 for not-acceptable errors.">406</ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+        </on-error-propagate>
+        <on-error-propagate type="APIKIT:UNSUPPORTED_MEDIA_TYPE" doc:description="Handles APIKIT:UNSUPPORTED_MEDIA_TYPE with a JSON message and HTTP 415.">
+            <ee:transform doc:name="Transform Message" doc:description="Builds the JSON error body and httpStatus variable for unsupported media types.">
+                <ee:message doc:description="Defines the JSON payload for unsupported-media-type errors.">
+                    <ee:set-payload doc:description="Sets a JSON body with an Unsupported media type message."><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Unsupported media type"}]]></ee:set-payload>
+                </ee:message>
+                <ee:variables doc:description="Sets the HTTP status variable for the unsupported-media-type response.">
+                    <ee:set-variable variableName="${api.statusVar}" doc:description="Sets httpStatus to 415 for unsupported-media-type errors.">415</ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+        </on-error-propagate>
+        <on-error-propagate type="APIKIT:NOT_IMPLEMENTED" doc:description="Handles APIKIT:NOT_IMPLEMENTED with a JSON message and HTTP 501.">
+            <ee:transform doc:name="Transform Message" doc:description="Builds the JSON error body and httpStatus variable for unimplemented operations.">
+                <ee:message doc:description="Defines the JSON payload for not-implemented errors.">
+                    <ee:set-payload doc:description="Sets a JSON body with a Not Implemented message."><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not Implemented"}]]></ee:set-payload>
+                </ee:message>
+                <ee:variables doc:description="Sets the HTTP status variable for the not-implemented response.">
+                    <ee:set-variable variableName="${api.statusVar}" doc:description="Sets httpStatus to 501 for not-implemented errors.">501</ee:set-variable>
+                </ee:variables>
+            </ee:transform>
+        </on-error-propagate>
+    </error-handler>
+</mule>
